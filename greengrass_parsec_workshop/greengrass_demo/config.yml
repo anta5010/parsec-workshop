@@ -13,10 +13,10 @@ services:
     componentType: "NUCLEUS"
     version: "2.5.0"
     configuration:
-      awsRegion: "eu-central-1"
-      iotRoleAlias: "GreengrassCoreTokenExchangeRoleAlias"
-      iotDataEndpoint: "device-data-prefix-ats.iot.eu-central-1.amazonaws.com"
-      iotCredEndpoint: "device-credentials-prefix.credentials.iot.eu-central-1.amazonaws.com"
+      awsRegion: "eu-west-1"
+      iotRoleAlias: "Proj-AntA-GreengrassCoreTokenExchangeRoleAlias"
+      iotDataEndpoint: "device-data-prefix-ats.iot.eu-west-1.amazonaws.com"
+      iotCredEndpoint: "device-credentials-prefix.credentials.iot.eu-west-1.amazonaws.com"
   aws.greengrass.crypto.ParsecProvider:
     configuration:
       name: "greengrass-parsec-plugin"

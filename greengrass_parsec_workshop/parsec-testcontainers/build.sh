@@ -12,4 +12,7 @@ docker buildx bake ${CACHE_CONFIG} \
   --load
 
 rm -rf ${docker_cache} || true
-mv ${docker_cache}_new ${docker_cache} || true
+if [ -n "$CACHE_CONFIG" ]; then
+  mv ${docker_cache}_new ${docker_cache} || true
+fi
+
