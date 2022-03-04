@@ -2,6 +2,8 @@
 set -e -o pipefail
 
 JAVA_OPTS=""
+GG_THING_GROUP=${GG_THING_GROUP:-GreengrassQuickStartGroup}
+
 case "${1}" in
 /bin/*sh)
   exec "$@"
@@ -28,7 +30,6 @@ if [ "${2}" == "debug" ]; then
   JAVA_OPTS="${JAVA_OPTS} -agentlib:jdwp=transport=dt_socket,server=y,suspend=y,address=5005"
   echo "using Debug config ${JAVA_OPTS}"
 fi
-
 
 for mandatory_env in GG_THING_NAME GG_PROVISION GG_START; do
   if [ "${!mandatory_env}" == "" ]; then
@@ -58,7 +59,7 @@ CMD="java ${JAVA_OPTS}
   -jar /greengrass/lib/Greengrass.jar
   --root /home/ggc_user
   --thing-name ${GG_THING_NAME}
-  --thing-group-name GreengrassQuickStartGroup
+  --thing-group-name ${GG_THING_GROUP}
   --component-default-user ggc_user:ggc_group
   --provision ${GG_PROVISION}
   --setup-system-service false
@@ -66,6 +67,7 @@ CMD="java ${JAVA_OPTS}
   --init-config /greengrass/config.yml
   --start ${GG_START} ${GG_ADDITIONAL_CMD_ARGS}
   "
+
 if [ "${GG_KEEP_RUNNING}" == "true" ]; then
   # shellcheck disable=SC2090
   ${CMD}
@@ -74,4 +76,3 @@ else
   # shellcheck disable=SC2086
   exec ${CMD}
 fi
-

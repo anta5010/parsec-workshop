@@ -39,34 +39,15 @@ RUN git clone --recursive  https://github.com/revaultch/aws-greengrass-nucleus.g
     mvn -N io.takari:maven:0.7.7:wrapper && \
     ./mvnw clean source:jar install -DskipTests=true
 
-ARG BUILD_TS=1
-RUN cd aws-crt-java && \
-    git pull && \
-    git submodule update --init && \
-    ./mvnw clean source:jar install -DskipTests=true -Dts=${BUILD_TS}
-
-RUN cd aws-iot-device-sdk-java-v2 && \
-    git pull && \
-    git submodule update --init && \
-    ./mvnw clean source:jar install -DskipTests=true -Dts=${BUILD_TS}
-
-RUN cd aws-greengrass-nucleus && \
-    git pull && \
-    git submodule update --init && \
-    ./mvnw clean source:jar install -DskipTests=true -Dts=${BUILD_TS}
-
-
-
-
 RUN find /root/.m2/repository/ -mindepth 2 -maxdepth 2 |grep -v -E '(com/aws|software/amazon)'|xargs rm -rf && \
     find /root/.m2/repository -type f
 
-FROM parallaxsecond/parsec:0.8.1 as parsec
+#FROM parallaxsecond/parsec:0.8.1 as parsec
 
 FROM amazoncorretto:8
 LABEL greengrass-version=${GREENGRASS_RELEASE_VERSION}
-COPY --from=parsec /bin/parsec-tool /bin/
-COPY --from=builder /greengrass/ /greengrass/
+# TO-DO: Do we need it for certificates?
+#COPY --from=parsec /bin/parsec-tool /bin/
 COPY --from=builder /greengrass/ /greengrass/
 COPY --from=from_source_builder /aws-greengrass-nucleus/target/Greengrass.jar /greengrass/lib/
 COPY --from=from_source_builder /root/.m2 /root/.m2
