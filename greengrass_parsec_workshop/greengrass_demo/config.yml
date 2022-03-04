@@ -9,9 +9,9 @@ system:
   rootpath: ""
 #  thingName: "${THING_NAME}"
 services:
-  aws.greengrass.Nucleus:
-    componentType: "NUCLEUS"
-    version: "2.5.0"
+#  aws.greengrass.Nucleus:
+#    componentType: "NUCLEUS"
+#    version: "2.5.0"
 #    configuration:
 #      awsRegion: "eu-west-1"
 #      iotRoleAlias: "Proj-AntA-GreengrassCoreTokenExchangeRoleAlias"
