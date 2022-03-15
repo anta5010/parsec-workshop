@@ -33,6 +33,12 @@ function build_parsec_containers() {
   popd
 }
 
+function build_parsec_tpm_container() {
+  pushd ./parsec-testcontainers/
+  ./build.sh parsec_tpm
+  popd
+}
+
 function build_greengrass_with_provider() {
   docker build . -f greengrass_demo/Dockerfile --tag parallaxsecond/greengrass_demo:latest  --progress plain
 }
@@ -43,7 +49,17 @@ function parsec_run() {
           -ti \
           -v GG_PARSEC_STORE:/var/lib/parsec/mappings \
           -v GG_PARSEC_SOCK:/run/parsec \
-           parallaxsecond/parsec:0.8.1
+           parallaxsecond/parsec:1.0.0rc2
+}
+
+function parsec_tpm_run() {
+    docker rm -f parsec_docker_run 2> /dev/null
+    docker run -d --name parsec_docker_run \
+          -ti \
+          -v GG_PARSEC_SOCK:/run/parsec \
+          --device /dev/tpm0 \
+          --device /dev/tpmrm0 \
+           parallaxsecond/parsec:1.0.0rc2tpm
 }
 
 function gg_run() {

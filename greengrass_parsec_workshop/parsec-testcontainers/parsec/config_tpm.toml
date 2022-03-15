@@ -1,0 +1,24 @@
+[core_settings]
+log_timestamp = false
+log_error_details = true
+allow_root = true
+
+[listener]
+listener_type = "DomainSocket"
+timeout = 200 # in milliseconds
+socket_path = "/run/parsec/parsec.sock"
+
+[authenticator]
+auth_type = "UnixPeerCredentials"
+
+[[key_manager]]
+name = "sqlite-manager"
+manager_type = "SQLite"
+store_path = "/var/lib/parsec/mappings/sqlite/sqlite-key-info-manager.sqlite3"
+
+[[provider]]
+name = "tpm-provider"
+provider_type = "Tpm"
+key_info_manager = "sqlite-manager"
+tcti = "device:/dev/tpmrm0"
+owner_hierarchy_auth = ""

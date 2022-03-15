@@ -1,4 +1,7 @@
 #!/bin/bash -e
+
+# $1 - Optional parameter defines which Parsec target to build.
+
 docker_cache=parsec_docker_cache
 
 CACHE_CONFIG=""
@@ -9,10 +12,11 @@ fi
 # shellcheck disable=SC2086
 docker buildx bake ${CACHE_CONFIG} \
   --progress plain \
-  --load
+  --load \
+  -f docker-bake.hcl \
+  $1
 
-rm -rf ${docker_cache} || true
 if [ -n "$CACHE_CONFIG" ]; then
+  rm -rf ${docker_cache} || true
   mv ${docker_cache}_new ${docker_cache} || true
 fi
-

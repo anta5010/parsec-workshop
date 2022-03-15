@@ -1,6 +1,6 @@
 group "default" {
-  #targets = ["parsec", "parsec_0.7.0", "parsec_0.8.1"]
-  targets = ["parsec_0.8.1"]
+  #targets = ["parsec", "parsec_0_8_1", "parsec_1_rc2", "parsec_1_rc2_tpm"]
+  targets = ["parsec_1_rc2"]
 }
 target "generic" {
   context = "."
@@ -18,7 +18,7 @@ target "parsec" {
     "parallaxsecond/parsec:latest"
   ]
 }
-target "parsec_0.8.1" {
+target "parsec_0_8_1" {
   inherits = ["parsec"]
   args = {
     PARSEC_BRANCH = "0.8.1"
@@ -27,12 +27,22 @@ target "parsec_0.8.1" {
     "parallaxsecond/parsec:0.8.1"
   ]
 }
-target "parsec_0.7.0" {
+target "parsec_tpm" {
   inherits = ["parsec"]
   args = {
-    PARSEC_BRANCH = "0.7.0"
+    PARSEC_BRANCH = "1.0.0-rc2"
+    PARSEC_CONFIG = "config_tpm.toml"
   }
   tags = [
-    "parallaxsecond/parsec:0.7.0"
+    "parallaxsecond/parsec:1.0.0rc2tpm"
+  ]
+}
+target "parsec_1_rc2" {
+  inherits = ["parsec"]
+  args = {
+    PARSEC_BRANCH = "1.0.0-rc2"
+  }
+  tags = [
+    "parallaxsecond/parsec:1.0.0rc2"
   ]
 }
