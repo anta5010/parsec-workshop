@@ -1,7 +1,5 @@
 #!/bin/bash
-set -e -o pipefail
-
-JAVA_OPTS=""
+set -e
 
 case "${1}" in
 /bin/*sh)
@@ -12,7 +10,13 @@ manual_run)
   :
   ;;
 *)
+  if [ -n "${AWS_ROLE_PREFIX}" ]; then
+    export GG_THING_GROUP=${GG_THING_GROUP:-${AWS_ROLE_PREFIX}-GreengrassQuickStartGroup}
+    GG_ADDITIONAL_CMD_ARGS="${GG_ADDITIONAL_CMD_ARGS} --tes-role-name ${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRole"
+    export GG_ADDITIONAL_CMD_ARGS="${GG_ADDITIONAL_CMD_ARGS} --tes-role-alias-name ${AWS_ROLE_PREFIX}-GreengrassCoreTokenExchangeRoleAlias"
+  fi
   /greengrass/start.sh $@
+  exit 0
 esac
 
 if [ "${2}" == "debug" ]; then
@@ -23,11 +27,6 @@ fi
 # Manual provisioning
 if ! /greengrass/aws_iot_thing_provision.sh; then
   echo "Failed to manually provission the GG thing"
-  exit 255
-fi
-
-if ! test -e /greengrass/config.yml; then
-  echo "Failed to create a config file /greengrass/config.yml"
   exit 255
 fi
 

@@ -124,6 +124,12 @@ function gg_run() {
 
 function provision_thing() {
   # Automatic GG provisioning
+
+  # Clean GG_HOME volume if exists
+  if docker volume inspect GG_HOME >/dev/null 2>&1; then
+    docker volume rm GG_HOME
+  fi
+
   source secrets.env
   gg_run greengrass_demo_provisioning provision
 }
@@ -135,7 +141,13 @@ function start_thing() {
 }
 
 function manual_run() {
-  # Manual provision and start a GG think
+  # Manual provision and start a GG thing
+
+  # Clean GG_HOME volume if exists
+  if docker volume inspect GG_HOME >/dev/null 2>&1; then
+    docker volume rm GG_HOME
+  fi
+
   source secrets.env
   gg_run greengrass_demo_run manual_run "-d -p 1441:1441 -p 1442:1442"
 }
