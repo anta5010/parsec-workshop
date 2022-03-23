@@ -4,6 +4,7 @@ pushd $(dirname $0)
 md5_cmd=md5
 
 PARSEC_VERSION="1.0.0rc2"
+PARSEC_TIMEOUT=60
 
 if ! test -x /sbin/md5; then
   md5_cmd=md5sum
@@ -15,9 +16,9 @@ if [ -z "$GG_THING_NAME" ]; then
     GG_THING_NAME=$(cat /etc/hostname)-GG-parsec
   fi
 
-  # GreenGrass think name must not contain dots
-  GG_THING_NAME=${GG_THING_NAME//\./_}
 fi
+# GreenGrass thing name must not contain dots
+GG_THING_NAME=${GG_THING_NAME//\./_}
 
 function update_git() {
   git submodule update --init --recursive
@@ -32,57 +33,83 @@ function build_greengrass_patched() {
   popd
 }
 
-function build_parsec_containers() {
-  # Build Parsec+Mbed-Crypto docker image
-  pushd ./parsec-testcontainers/
-  ./build.sh
-  popd
-}
-
-function build_parsec_tpm_containers() {
-  # Build Parsec+TPM docker image
-
-  pushd ./parsec-testcontainers/
-  ./build.sh parsec_tpm
-  popd
-}
-
 function build_greengrass_with_provider() {
   # Build the demo docker image including Parsec GG provider
 
   docker build . -f greengrass_demo/Dockerfile --tag parallaxsecond/greengrass_demo:latest  --progress plain
 }
 
-function parsec_run() {
-  # Run a container from Parsec+Mbed-Crypto provider image if exists
-
-  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION} >/dev/null 2>&1; then
-    docker rm -f parsec_docker_run 2> /dev/null
-    docker run -d --name parsec_docker_run \
-          -ti \
-          -v GG_PARSEC_STORE:/var/lib/parsec/mappings \
-          -v ${PARSEC_VOLUME:-GG_PARSEC_SOCK}:/run/parsec \
-           parallaxsecond/parsec:${PARSEC_VERSION}
-  else
-    echo "INFO: Parsec image parallaxsecond/parsec:${PARSEC_VERSION} is missing."
-    echo "      Build it if Parsec running in a container is required"
-  fi
+function build_parsec_images() {
+  # Build Parsec+Mbed-Crypto provider docker image
+  pushd ./parsec-testcontainers/
+  ./build.sh
+  popd
 }
 
-function parsec_tpm_run() {
-  # Run a container from Parsec+TPM provider image if exists
-  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION} >/dev/null 2>&1; then
+function build_parsec_tpm_image() {
+  # Build Parsec+TPM provider docker image
+  pushd ./parsec-testcontainers/
+  ./build.sh parsec_tpm
+  popd
+}
+
+function wait_for_parsec() {
+
+  if [ "$1" == docker ] ; then
+    echo "Waiting for Parsec service in parsec_docker_run container"
+    PARSEC_TOOL_CMD="docker exec -it parsec_docker_run parsec-tool ping"
+  else
+    echo "Checking for Parsec service running on the host"
+    PARSEC_TOOL_CMD="parsec-tool ping"
+  fi
+
+  WAIT_TIME=0
+  while [ $WAIT_TIME -lt $PARSEC_TIMEOUT ]; do
+    if $PARSEC_TOOL_CMD >/dev/null; then
+      echo "Pasrec is ready"
+      return
+    fi
+    WAIT_TIME=$((WAIT_TIME+2))
+    sleep 2
+  done
+
+  if [ "$1" == docker ] ; then
+    echo "ERROR: Parsec service in parsec_docker_run container is not functional"
+  else
+    echo "ERROR: Parsec service on the host is not functional"
+  fi
+  exit 1
+}
+
+function parsec_run() {
+  # Run a container from Parsec+Mbed-Crypto or TPM provider image if exists
+  # otherwise check if Parsec is running on the host
+
+  if [ "$1" == "tpm" ]; then
+    DOCKER_DEVICES="--device /dev/tpm0 --device /dev/tpmrm0"
+    GG_PARSEC_STORE="GG_PARSEC_STORE_TPM"
+    GG_PARSEC_SOCK="GG_PARSEC_SOCK_TPM"
+  else
+    DOCKER_DEVICES=""
+    GG_PARSEC_STORE="GG_PARSEC_STORE"
+    GG_PARSEC_SOCK="GG_PARSEC_SOCK"
+  fi
+
+  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION}${1} >/dev/null 2>&1; then
     docker rm -f parsec_docker_run 2> /dev/null
     docker run -d --name parsec_docker_run \
           -ti \
-          -v ${PARSEC_VOLUME:-GG_PARSEC_SOCK}:/run/parsec \
-          --device /dev/tpm0 \
-          --device /dev/tpmrm0 \
-           parallaxsecond/parsec:${PARSEC_VERSION}tpm
+          -v ${GG_PARSEC_STORE}:/var/lib/parsec/mappings \
+          -v ${GG_PARSEC_SOCK}:/run/parsec \
+          $DOCKER_DEVICES \
+           parallaxsecond/parsec:${PARSEC_VERSION}${1}
+    wait_for_parsec docker
   else
-    echo "INFO: Parsec image parallaxsecond/parsec:${PARSEC_VERSION}tpm is missing."
+    echo "INFO: Parsec image parallaxsecond/parsec:${PARSEC_VERSION}${1} is missing."
     echo "      Build it if Parsec running in a container is required"
+    wait_for_parsec
   fi
+
 }
 
 function gg_run() {
@@ -98,22 +125,12 @@ function gg_run() {
 
   GG_ADDITIONAL_CMD_ARGS="--trusted-plugin /provider.jar"
 
-  if [ -z "${PARSEC_VOLUME}" ]; then
-    # Check if we run Parsec in a container
-    if docker volume inspect GG_PARSEC_SOCK >/dev/null 2>&1; then
-      # Parsec is running in a container
-      PARSEC_VOLUME_MAP="GG_PARSEC_SOCK:/run/parsec"
-    else
-      # Parsec is running on host
-      PARSEC_VOLUME_MAP="/run/parsec:/run/parsec"
-    fi
+  if inspect=$(docker container inspect parsec_docker_run 2>/dev/null | grep ":/run/parsec"); then
+    # Parsec is running in a container
+    PARSEC_SOCK_VOLUME=${inspect//\"/}
   else
-    if docker volume inspect ${PARSEC_VOLUME} >/dev/null 2>&1; then
-      PARSEC_VOLUME_MAP="${PARSEC_VOLUME}:/run/parsec"
-    else
-      echo "Docker volume ${PARSEC_VOLUME} doesn't exist"
-      exit 1
-    fi
+    # Parsec is running on the host
+    PARSEC_SOCK_VOLUME="/run/parsec:/run/parsec"
   fi
 
   # shellcheck disable=SC2086
@@ -129,7 +146,7 @@ function gg_run() {
          -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
          -e AWS_ROLE_PREFIX="${AWS_ROLE_PREFIX}" \
          -e AWS_BOUNDARY_POLICY="${AWS_BOUNDARY_POLICY}" \
-         -v ${PARSEC_VOLUME_MAP} \
+         -v ${PARSEC_SOCK_VOLUME} \
          -v GG_HOME:/home/ggc_user \
          parallaxsecond/greengrass_demo:latest "${2}"
 }
@@ -146,11 +163,11 @@ function start_thing() {
   gg_run greengrass_demo_run run "-d -p 1441:1441 -p 1442:1442"
 }
 
-function manual_run() {
+function manual_gg_run() {
   # Manual provision and start a GG thing
 
   if [ "$1" == "init" ]; then
-    # Clean GG_HOME volume if exists
+    echo "Cleaning GG_HOME volume if exists"
     if docker volume inspect GG_HOME >/dev/null 2>&1; then
       if docker container inspect greengrass_demo_run >/dev/null 2>&1; then
         docker container rm greengrass_demo_run >/dev/null
@@ -174,14 +191,14 @@ function run_demo() {
 function run_manual_demo() {
   # Start the demo using manual GG provisioning
   parsec_run
-  manual_run ${1}
+  manual_gg_run ${1}
   docker logs -f greengrass_demo_run
 }
 
 function run_manual_demo_tpm() {
   # Start Parsec with TPM provider and the demo using manual GG provisioning
-  parsec_tpm_run
-  manual_run
+  parsec_run tpm
+  manual_gg_run ${1}
   docker logs -f greengrass_demo_run
 }
 
@@ -198,7 +215,7 @@ function build() {
   # Build Parsec image with Mbed-Crypto provider and GG images
 
   echo "Starting build Parsec images..."
-  build_parsec_containers
+  build_parsec_images
   echo "Build Done."
   build_gg
 }
@@ -207,7 +224,7 @@ function build_tpm() {
   # Build Parsec image with TPM provider and GG images
 
   echo "Starting build Parsec TPM images..."
-  build_parsec_tpm_containers
+  build_parsec_tpm_images
   echo "Build Done."
   build_gg
 }
