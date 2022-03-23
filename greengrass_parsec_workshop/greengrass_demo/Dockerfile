@@ -21,11 +21,11 @@ RUN set -e -x; \
 FROM parallaxsecond/greengrass_patched:latest
 RUN yum install -y which openssl
 
-COPY greengrass_demo/*.sh /greengrass/
-COPY greengrass_demo/config.yml /greengrass/
-
+COPY --from=from_source_builder /project/aws-greengrass-parsec-provider/parsec-greengrass-plugin/target/aws.greengrass.crypto.ParsecProvider.jar /provider.jar
 COPY --from=from_source_builder /root/.cargo/bin/parsec-tool /usr/bin/
 COPY --from=from_source_builder /usr/bin/parsec-cli-tests.sh /usr/bin/
-COPY --from=from_source_builder /project/aws-greengrass-parsec-provider/parsec-greengrass-plugin/target/aws.greengrass.crypto.ParsecProvider.jar /provider.jar
+
+COPY greengrass_demo/config.yml /greengrass/
+COPY greengrass_demo/*.sh /greengrass/
 
 ENTRYPOINT ["/greengrass/demo_start.sh"]

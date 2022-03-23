@@ -56,30 +56,32 @@ function build_greengrass_with_provider() {
 function parsec_run() {
   # Run a container from Parsec+Mbed-Crypto provider image if exists
 
-  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION} >/dev/null; then
+  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION} >/dev/null 2>&1; then
     docker rm -f parsec_docker_run 2> /dev/null
     docker run -d --name parsec_docker_run \
           -ti \
           -v GG_PARSEC_STORE:/var/lib/parsec/mappings \
-          -v GG_PARSEC_SOCK:/run/parsec \
+          -v ${PARSEC_VOLUME:-GG_PARSEC_SOCK}:/run/parsec \
            parallaxsecond/parsec:${PARSEC_VERSION}
   else
-    echo "Parsec image is missing. Build it if Parsec running in a container is required"
+    echo "INFO: Parsec image parallaxsecond/parsec:${PARSEC_VERSION} is missing."
+    echo "      Build it if Parsec running in a container is required"
   fi
 }
 
 function parsec_tpm_run() {
   # Run a container from Parsec+TPM provider image if exists
-  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION} >/dev/null; then
+  if docker image inspect parallaxsecond/parsec:${PARSEC_VERSION} >/dev/null 2>&1; then
     docker rm -f parsec_docker_run 2> /dev/null
     docker run -d --name parsec_docker_run \
           -ti \
-          -v GG_PARSEC_SOCK:/run/parsec \
+          -v ${PARSEC_VOLUME:-GG_PARSEC_SOCK}:/run/parsec \
           --device /dev/tpm0 \
           --device /dev/tpmrm0 \
            parallaxsecond/parsec:${PARSEC_VERSION}tpm
   else
-    echo "Parsec image is missing. Build it if Parsec running in a container is required"
+    echo "INFO: Parsec image parallaxsecond/parsec:${PARSEC_VERSION}tpm is missing."
+    echo "      Build it if Parsec running in a container is required"
   fi
 }
 
@@ -96,18 +98,28 @@ function gg_run() {
 
   GG_ADDITIONAL_CMD_ARGS="--trusted-plugin /provider.jar"
 
-  # Check if we run Parsec in a container
-  if docker volume inspect GG_PARSEC_SOCK >/dev/null 2>&1; then
-    # Parsec is running in a container
-    PARSEC_VOLUME="GG_PARSEC_SOCK:/run/parsec"
+  if [ -z "${PARSEC_VOLUME}" ]; then
+    # Check if we run Parsec in a container
+    if docker volume inspect GG_PARSEC_SOCK >/dev/null 2>&1; then
+      # Parsec is running in a container
+      PARSEC_VOLUME_MAP="GG_PARSEC_SOCK:/run/parsec"
+    else
+      # Parsec is running on host
+      PARSEC_VOLUME_MAP="/run/parsec:/run/parsec"
+    fi
   else
-    # Parsec is running on host
-    PARSEC_VOLUME="/run/parsec:/run/parsec"
+    if docker volume inspect ${PARSEC_VOLUME} >/dev/null 2>&1; then
+      PARSEC_VOLUME_MAP="${PARSEC_VOLUME}:/run/parsec"
+    else
+      echo "Docker volume ${PARSEC_VOLUME} doesn't exist"
+      exit 1
+    fi
   fi
 
   # shellcheck disable=SC2086
   docker run ${3} \
          --name "${1}" \
+         -e JAVA_OPTS="${JAVA_OPTS}" \
          -e GG_THING_NAME="${GG_THING_NAME}" \
          -e GG_THING_GROUP="${GG_THING_GROUP}" \
          -e GG_ADDITIONAL_CMD_ARGS="${GG_ADDITIONAL_CMD_ARGS}" \
@@ -117,19 +129,13 @@ function gg_run() {
          -e AWS_SESSION_TOKEN="${AWS_SESSION_TOKEN}" \
          -e AWS_ROLE_PREFIX="${AWS_ROLE_PREFIX}" \
          -e AWS_BOUNDARY_POLICY="${AWS_BOUNDARY_POLICY}" \
-         -v ${PARSEC_VOLUME} \
+         -v ${PARSEC_VOLUME_MAP} \
          -v GG_HOME:/home/ggc_user \
          parallaxsecond/greengrass_demo:latest "${2}"
 }
 
 function provision_thing() {
   # Automatic GG provisioning
-
-  # Clean GG_HOME volume if exists
-  if docker volume inspect GG_HOME >/dev/null 2>&1; then
-    docker volume rm GG_HOME
-  fi
-
   source secrets.env
   gg_run greengrass_demo_provisioning provision
 }
@@ -143,9 +149,14 @@ function start_thing() {
 function manual_run() {
   # Manual provision and start a GG thing
 
-  # Clean GG_HOME volume if exists
-  if docker volume inspect GG_HOME >/dev/null 2>&1; then
-    docker volume rm GG_HOME
+  if [ "$1" == "init" ]; then
+    # Clean GG_HOME volume if exists
+    if docker volume inspect GG_HOME >/dev/null 2>&1; then
+      if docker container inspect greengrass_demo_run >/dev/null 2>&1; then
+        docker container rm greengrass_demo_run >/dev/null
+      fi
+      docker volume rm GG_HOME >/dev/null
+    fi
   fi
 
   source secrets.env
@@ -163,7 +174,7 @@ function run_demo() {
 function run_manual_demo() {
   # Start the demo using manual GG provisioning
   parsec_run
-  manual_run
+  manual_run ${1}
   docker logs -f greengrass_demo_run
 }
 

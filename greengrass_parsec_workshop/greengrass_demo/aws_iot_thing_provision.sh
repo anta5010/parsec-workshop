@@ -25,6 +25,15 @@
 
 set -e
 
+GG_USER_HOME=${GG_USER_HOME:-/home/ggc_user}
+if [ -f "${GG_USER_HOME}/generated_config.yml" ]; then
+  echo "WARNING: Generated GreenGrass config already exists. Skip provisioning."
+  echo "If you want re-provision then remove:"
+  echo " greegrass_demo_run docker container and GG_HOME docker volume"
+  echo "or run 'run_manual_demo' command with 'init' parameter"
+  exit 0
+fi
+
 for mandatory_env in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION GG_THING_NAME; do
   if [ "${!mandatory_env}" == "" ]; then
     echo "The env variable ${mandatory_env} needs to be set"
@@ -46,45 +55,53 @@ if [ -n "${AWS_ROLE_PREFIX}" ]; then
   AWS_PREFIX="${AWS_ROLE_PREFIX}-"
 fi
 
-echo "Create an AWS IoT thing and its group"
 # https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html#create-iot-thing
 
 GG_THING_GROUP=${GG_THING_GROUP:-${AWS_PREFIX}GreengrassQuickStartGroup}
 
-aws iot create-thing-group --thing-group-name ${GG_THING_GROUP}
+echo "Deleting old thing and certificates if exist"
+if aws iot describe-thing --thing-name ${GG_THING_NAME} 2>/dev/null 1>&2; then
+  # Delete old certificates if exist
+  for cert in $(aws iot list-thing-principals --thing-name ${GG_THING_NAME} --query "principals" --output text); do
+    aws iot detach-thing-principal --thing-name ${GG_THING_NAME} --principal $cert
+
+    cert_id=${cert##*/}
+    aws iot update-certificate --certificate-id $cert_id --new-status INACTIVE
+    aws iot delete-certificate --force-delete --certificate-id $cert_id
+  done
+
+  aws iot delete-thing --thing-name ${GG_THING_NAME}
+fi
+
+echo "Creating ${GG_THING_NAME} IoT thing and group ${GG_THING_GROUP}"
 aws iot create-thing --thing-name ${GG_THING_NAME}
+aws iot create-thing-group --thing-group-name ${GG_THING_GROUP}
 aws iot add-thing-to-thing-group --thing-name ${GG_THING_NAME} --thing-group-name ${GG_THING_GROUP}
 
 echo "Create the thing certificate using an RSA key created with parsec-tool"
 # https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html#create-thing-certificate
 
 # Create an RSA signature key if it doesn't exist
-if ! parsec-tool export-public-key --key-name ${GG_THING_NAME} >/dev/nul 2>&1; then
-  parsec-tool create-rsa-key -s --key-name ${GG_THING_NAME}
+
+# There is a GreenGrass or Parsec GreenGrass plugin issue with HTTP connections.
+# The key name must be lower case to be found HTTP connections certificates list.
+
+KEY_NAME=${GG_THING_NAME,,}
+if ! parsec-tool export-public-key --key-name ${KEY_NAME} >/dev/nul 2>&1; then
+  parsec-tool create-rsa-key -s --key-name ${KEY_NAME}
 fi
-parsec-tool create-csr --key-name ${GG_THING_NAME} --cn "${GG_THING_NAME}" >${GG_THING_NAME}-devicekey.csr
+parsec-tool create-csr --key-name ${KEY_NAME} --cn "${GG_THING_NAME}" >${GG_THING_NAME}-devicekey.csr
 
 # Create a new certificate
 gg_cert_arn=$(aws iot create-certificate-from-csr --set-as-active \
         --certificate-signing-request=file://${GG_THING_NAME}-devicekey.csr \
-        --certificate-pem-outfile /home/ggc_user/device.pem.crt --output text --query "certificateArn")
+        --certificate-pem-outfile ${GG_USER_HOME}/device.pem.crt --output text --query "certificateArn")
 rm -f ${GG_THING_NAME}-devicekey.csr
 
-echo "Configure the thing certificate"
 # https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html#configure-thing-certificate
 
-# Delete old certificates if exist
-for cert in $(aws iot list-thing-principals --thing-name ${GG_THING_NAME} --query "principals" --output text); do
-  aws iot detach-thing-principal --thing-name ${GG_THING_NAME} --principal $cert
-
-  cert_id=${cert##*/}
-  aws iot update-certificate --certificate-id $cert_id --new-status INACTIVE
-  aws iot delete-certificate --force-delete --certificate-id $cert_id
-done
-
-aws iot attach-thing-principal --thing-name ${GG_THING_NAME} --principal ${gg_cert_arn}
-
 if ! aws iot get-policy --policy-name ${AWS_PREFIX}GreengrassV2IoTThingPolicy 2>/dev/null 1>&2; then
+  echo "Creating IoT thing policy ${AWS_PREFIX}GreengrassV2IoTThingPolicy"
 
   cat <<EOF >greengrass-v2-iot-policy.json
 {
@@ -93,15 +110,13 @@ if ! aws iot get-policy --policy-name ${AWS_PREFIX}GreengrassV2IoTThingPolicy 2>
     {
       "Effect": "Allow",
       "Action": [
+        "iot:Connect",
         "iot:Publish",
         "iot:Subscribe",
         "iot:Receive",
-        "iot:Connect",
         "greengrass:*"
       ],
-      "Resource": [
-        "*"
-      ]
+      "Resource": "*"
     }
   ]
 }
@@ -110,19 +125,26 @@ EOF
   aws iot create-policy --policy-name ${AWS_PREFIX}GreengrassV2IoTThingPolicy \
           --policy-document file://greengrass-v2-iot-policy.json
   rm -f greengrass-v2-iot-policy.json
+else
+  echo "Using existing IoT thing policy ${AWS_PREFIX}GreengrassV2IoTThingPolicy"
 fi
 
+echo "Attaching policy to certificate"
 aws iot attach-policy --policy-name ${AWS_PREFIX}GreengrassV2IoTThingPolicy \
         --target ${gg_cert_arn}
 
-echo "Create a token exchange role"
+echo "Attaching certificate to IoT thing"
+aws iot attach-thing-principal --thing-name ${GG_THING_NAME} --principal ${gg_cert_arn}
+
 # https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html#create-token-exchange-role
 
-if [ -n "${AWS_BOUNDARY_POLICY}" ]; then
-  PERMISSION_BOUNDARY="--permissions-boundary arn:aws:iam::${AWS_ID}:policy/${AWS_BOUNDARY_POLICY}"
-fi
-
 if ! aws iam get-role --role-name ${AWS_PREFIX}GreengrassV2TokenExchangeRole 2>/dev/null 1>&2; then
+  echo "Creating token exchange IAM role ${AWS_PREFIX}GreengrassV2TokenExchangeRole"
+
+  if [ -n "${AWS_BOUNDARY_POLICY}" ]; then
+    PERMISSION_BOUNDARY="--permissions-boundary arn:aws:iam::${AWS_ID}:policy/${AWS_BOUNDARY_POLICY}"
+  fi
+
   cat <<EOF >device-role-trust-policy.json
 {
   "Version": "2012-10-17",
@@ -142,9 +164,13 @@ EOF
           --assume-role-policy-document file://device-role-trust-policy.json \
           ${PERMISSION_BOUNDARY}
   rm -f device-role-trust-policy.json
+else
+  echo "Using existing token exchange IAM role ${AWS_PREFIX}GreengrassV2TokenExchangeRole"
 fi
 
 if ! aws iam get-policy --policy-arn arn:aws:iam::${AWS_ID}:policy/${AWS_PREFIX}GreengrassV2TokenExchangeRoleAccess 2>/dev/null 1>&2; then
+  echo "Creating a role access IAM policy ${AWS_PREFIX}GreengrassV2TokenExchangeRoleAccess"
+
   cat <<EOF >device-role-access-policy.json
 {
   "Version": "2012-10-17",
@@ -168,20 +194,27 @@ EOF
   aws iam create-policy --policy-name ${AWS_PREFIX}GreengrassV2TokenExchangeRoleAccess \
                         --policy-document file://device-role-access-policy.json
   rm -f device-role-access-policy.json
+else
+  echo "Using existing role access IAM policy ${AWS_PREFIX}GreengrassV2TokenExchangeRoleAccess"
 fi
 
+echo "Attaching IAM role access policy to IAM token exchange role"
 aws iam attach-role-policy --role-name ${AWS_PREFIX}GreengrassV2TokenExchangeRole \
         --policy-arn arn:aws:iam::${AWS_ID}:policy/${AWS_PREFIX}GreengrassV2TokenExchangeRoleAccess
 
 if ! aws iot describe-role-alias --role-alias ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAlias 2>/dev/null 1>&2; then
+  echo "Creating IoT role alias ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAlias"
   aws iot create-role-alias --role-alias ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAlias \
           --role-arn arn:aws:iam::${AWS_ID}:role/${AWS_PREFIX}GreengrassV2TokenExchangeRole
+else
+  echo "Using existing IoT role alias ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAlias"
 fi
 
-role_arn=$(aws iot describe-role-alias --role-alias ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAlias \
-           --query "roleAliasDescription.roleArn")
+role_alias_arn=$(aws iot describe-role-alias --role-alias ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAlias \
+           --query "roleAliasDescription.roleAliasArn")
 
 if ! aws iot get-policy --policy-name ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAliasPolicy 2>/dev/null 1>&2; then
+  echo "Creating IoT role alias policy ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAliasPolicy"
   cat <<EOF >greengrass-v2-iot-role-alias-policy.json
 {
   "Version":"2012-10-17",
@@ -189,33 +222,34 @@ if ! aws iot get-policy --policy-name ${AWS_PREFIX}GreengrassCoreTokenExchangeRo
     {
       "Effect": "Allow",
       "Action": "iot:AssumeRoleWithCertificate",
-      "Resource": ${role_arn}
+      "Resource": ${role_alias_arn}
     }
   ]
 }
 EOF
-
   aws iot create-policy --policy-name ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAliasPolicy \
           --policy-document file://greengrass-v2-iot-role-alias-policy.json
   rm -f greengrass-v2-iot-role-alias-policy.json
+else
+  echo "Using existing IoT role alias policy ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAliasPolicy"
 fi
 
+echo "Attaching IoT role alias policy to certificate"
 aws iot attach-policy --policy-name ${AWS_PREFIX}GreengrassCoreTokenExchangeRoleAliasPolicy \
         --target ${gg_cert_arn}
 
-echo "Create GreenGrass config file"
-
+echo "Creating GreenGrass config file"
 iot_endpoint=$(aws iot describe-endpoint --endpoint-type iot:Data-ATS --output text)
 cred_endpoint=$(aws iot describe-endpoint --endpoint-type iot:CredentialProvider --output text)
 
 curl https://www.amazontrust.com/repository/AmazonRootCA1.pem \
-     >/home/ggc_user/AmazonRootCA1.pem 2>/dev/null
+     >${GG_USER_HOME}/AmazonRootCA1.pem 2>/dev/null
 
-cat <<EOF >/greengrass/config.yml
+cat <<EOF >${GG_USER_HOME}/generated_config.yml
 system:
-  certificateFilePath: "parsec:import=/home/ggc_user/device.pem.crt;object=${GG_THING_NAME};type=cert"
-  privateKeyPath: "parsec:object=${GG_THING_NAME};type=private"
-  rootCaPath: "/home/ggc_user/AmazonRootCA1.pem"
+  certificateFilePath: "parsec:import=${GG_USER_HOME}/device.pem.crt;object=${KEY_NAME};type=cert"
+  privateKeyPath: "parsec:object=${KEY_NAME};type=private"
+  rootCaPath: "${GG_USER_HOME}/AmazonRootCA1.pem"
   rootpath: ""
   thingName: "${GG_THING_NAME}"
 services:

@@ -39,7 +39,7 @@ CMD="java ${JAVA_OPTS}
   --provision false
   --root /home/ggc_user
   --component-default-user ggc_user:ggc_group
-  --init-config /greengrass/config.yml
+  --init-config /home/ggc_user/generated_config.yml
   --start true
   ${GG_ADDITIONAL_CMD_ARGS}
   "
