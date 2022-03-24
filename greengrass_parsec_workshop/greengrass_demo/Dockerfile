@@ -7,7 +7,7 @@ RUN curl https://sh.rustup.rs -sSf | sh -s -- -y
 
 RUN yum install -y git gcc
 
-ARG PARSEC_TOOL_VERSION=0.5.1
+ARG PARSEC_TOOL_VERSION=0.5.2
 RUN set -e -x; \
     source $HOME/.cargo/env; \
     git clone https://github.com/parallaxsecond/parsec-tool; \

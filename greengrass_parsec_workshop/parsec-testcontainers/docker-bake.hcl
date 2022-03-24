@@ -1,6 +1,6 @@
 group "default" {
-  #targets = ["parsec", "parsec_0_8_1", "parsec_1_rc2", "parsec_1_rc2_tpm"]
-  targets = ["parsec_1_rc2"]
+  #targets = ["parsec", "parsec_0_8_1", "parsec_1_rc3", "parsec_tpm"]
+  targets = ["parsec_1_rc3"]
 }
 target "generic" {
   context = "."
@@ -30,19 +30,19 @@ target "parsec_0_8_1" {
 target "parsec_tpm" {
   inherits = ["parsec"]
   args = {
-    PARSEC_BRANCH = "1.0.0-rc2"
+    PARSEC_BRANCH = "1.0.0-rc3"
     PARSEC_CONFIG = "config_tpm.toml"
   }
   tags = [
-    "parallaxsecond/parsec:1.0.0rc2tpm"
+    "parallaxsecond/parsec:1.0.0rc3tpm"
   ]
 }
-target "parsec_1_rc2" {
+target "parsec_1_rc3" {
   inherits = ["parsec"]
   args = {
-    PARSEC_BRANCH = "1.0.0-rc2"
+    PARSEC_BRANCH = "1.0.0-rc3"
   }
   tags = [
-    "parallaxsecond/parsec:1.0.0rc2"
+    "parallaxsecond/parsec:1.0.0rc3"
   ]
 }

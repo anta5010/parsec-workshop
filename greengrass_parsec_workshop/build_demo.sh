@@ -3,7 +3,7 @@ set -e
 pushd $(dirname $0)
 md5_cmd=md5
 
-PARSEC_VERSION="1.0.0rc2"
+PARSEC_VERSION="1.0.0rc3"
 PARSEC_TIMEOUT=60
 
 if ! test -x /sbin/md5; then

@@ -42,12 +42,8 @@ RUN git clone --recursive  https://github.com/revaultch/aws-greengrass-nucleus.g
 RUN find /root/.m2/repository/ -mindepth 2 -maxdepth 2 |grep -v -E '(com/aws|software/amazon)'|xargs rm -rf && \
     find /root/.m2/repository -type f
 
-#FROM parallaxsecond/parsec:0.8.1 as parsec
-
 FROM amazoncorretto:8
 LABEL greengrass-version=${GREENGRASS_RELEASE_VERSION}
-# TO-DO: Do we need it for certificates?
-#COPY --from=parsec /bin/parsec-tool /bin/
 COPY --from=builder /greengrass/ /greengrass/
 COPY --from=from_source_builder /aws-greengrass-nucleus/target/Greengrass.jar /greengrass/lib/
 COPY --from=from_source_builder /root/.m2 /root/.m2
