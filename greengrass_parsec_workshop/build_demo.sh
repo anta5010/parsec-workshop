@@ -25,7 +25,7 @@ function update_git() {
 }
 
 function build_greengrass_patched() {
-  # Build GreenGrass docker images using key-op-prototype branch of AWS SDKs
+  # Build GreenGrass docker image using key-op-prototype branch of AWS SDKs
   pushd ./parsec-greengrass-run-config/docker/
   docker build . \
         --tag parallaxsecond/greengrass_patched:latest \
@@ -39,7 +39,7 @@ function build_greengrass_with_provider() {
   docker build . -f greengrass_demo/Dockerfile --tag parallaxsecond/greengrass_demo:latest  --progress plain
 }
 
-function build_parsec_images() {
+function build_parsec_image() {
   # Build Parsec+Mbed-Crypto provider docker image
   pushd ./parsec-testcontainers/
   ./build.sh
@@ -212,19 +212,19 @@ function build_gg() {
 }
 
 function build() {
-  # Build Parsec image with Mbed-Crypto provider and GG images
+  # Build Parsec with Mbed-Crypto provider and GG docker images
 
-  echo "Starting build Parsec images..."
-  build_parsec_images
+  echo "Starting build Parsec image..."
+  build_parsec_image
   echo "Build Done."
   build_gg
 }
 
 function build_tpm() {
-  # Build Parsec image with TPM provider and GG images
+  # Build Parsec with TPM provider and GG docker images
 
-  echo "Starting build Parsec TPM images..."
-  build_parsec_tpm_images
+  echo "Starting build Parsec TPM image..."
+  build_parsec_tpm_image
   echo "Build Done."
   build_gg
 }
