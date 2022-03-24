@@ -10,16 +10,16 @@
 # - Generates GreenGrass config file
 # The script follows https://docs.aws.amazon.com/greengrass/v2/developerguide/manual-installation.html
 
-# There are mandatory and optional ENV variables used by thhis script
+# There are mandatory and optional ENV variables used by this script
 # Mandatory:
 # - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - AWS access settings
-# - AWS_REGION - The AWS region where the IOT thing created
+# - AWS_REGION - The AWS region where the IOT thing will be created
 # - GG_THING_NAME - AWS IOT thing name
 # Optional:
-# - AWS_SESSION_TOKEN - AWS session token if used.
-# - AWS_BOUNDARY_POLICY - A boundary policy name for IAM roles if required.
 # - GG_THING_GROUP - IOT group name for the thing.
 #   default: ${AWS_ROLE_PREFIX}GreengrassQuickStartGroup
+# - AWS_SESSION_TOKEN - AWS session token if used.
+# - AWS_BOUNDARY_POLICY - A boundary policy name for IAM roles if required.
 # - AWS_ROLE_PREFIX - A prefix added to all created policies and roles names
 #   default: empty
 

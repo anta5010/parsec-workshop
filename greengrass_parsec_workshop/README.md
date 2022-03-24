@@ -82,6 +82,17 @@ it was provisioned before. If you would like to re-provision it then add `init` 
 ./build_demo.sh run_manual_demo init
 ```
 
+`build_demo.sh` script and GreenGrass use some ENV variables which should be defined in `secrets.env` file in the same directory where the script is.
+This is what can be defined:
+- Mandatory settings
+   - AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - AWS access settings
+   - AWS_REGION - The AWS region where the IOT thing will be created
+- Optional settings
+   - GG_THING_NAME - AWS IOT thing name. (default: the device host name)
+   - GG_THING_GROUP - IOT group name for the thing. (default: ${AWS_ROLE_PREFIX}GreengrassQuickStartGroup)
+   - AWS_ROLE_PREFIX - A prefix added to all created AWS policies and roles names. (default: empty)
+   - AWS_SESSION_TOKEN - AWS session token if required.
+   - AWS_BOUNDARY_POLICY - A boundary policy name for IAM roles if required.
 
 ### Example of 
 
