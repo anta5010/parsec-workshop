@@ -30,7 +30,8 @@ target "parsec_0_8_1" {
 target "parsec_tpm" {
   inherits = ["parsec"]
   args = {
-    PARSEC_BRANCH = "1.0.0-rc3"
+    PARSEC_REPO = "https://github.com/anta5010/parsec.git"
+    PARSEC_BRANCH = "get_random"
     PARSEC_CONFIG = "config_tpm.toml"
   }
   tags = [

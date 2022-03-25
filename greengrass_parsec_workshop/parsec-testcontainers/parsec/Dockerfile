@@ -44,11 +44,12 @@ RUN set -e -x; \
     cd ..; \
     rm -rf parsec-tool
 
+ARG PARSEC_REPO="https://github.com/parallaxsecond/parsec"
 ARG PARSEC_BRANCH=0.8.1
 ARG PARSEC_FEATURES="tpm-provider,mbed-crypto-provider,unix-peer-credentials-authenticator,direct-authenticator"
 RUN set -e -x; \
     source $HOME/.cargo/env; \
-    git clone https://github.com/parallaxsecond/parsec; \
+    git clone ${PARSEC_REPO}; \
     cd parsec; \
     git checkout ${PARSEC_BRANCH}; \
     cargo install --features "${PARSEC_FEATURES}" --path .; \
