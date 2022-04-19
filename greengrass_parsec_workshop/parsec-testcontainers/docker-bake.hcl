@@ -1,6 +1,6 @@
 group "default" {
-  #targets = ["parsec", "parsec_0_8_1", "parsec_1_rc3", "parsec_tpm"]
-  targets = ["parsec_1_rc3"]
+  #targets = ["parsec", "parsec_0_8_1", "parsec_1", "parsec_tpm"]
+  targets = ["parsec_1"]
 }
 target "generic" {
   context = "."
@@ -30,20 +30,18 @@ target "parsec_0_8_1" {
 target "parsec_tpm" {
   inherits = ["parsec"]
   args = {
-    PARSEC_REPO = "https://github.com/anta5010/parsec.git"
-    PARSEC_BRANCH = "get_random"
     PARSEC_CONFIG = "config_tpm.toml"
   }
   tags = [
-    "parallaxsecond/parsec:1.0.0rc3tpm"
+    "parallaxsecond/parsec:1.0.0tpm"
   ]
 }
-target "parsec_1_rc3" {
+target "parsec_1" {
   inherits = ["parsec"]
   args = {
-    PARSEC_BRANCH = "1.0.0-rc3"
+    PARSEC_BRANCH = "1.0.0"
   }
   tags = [
-    "parallaxsecond/parsec:1.0.0rc3"
+    "parallaxsecond/parsec:1.0.0"
   ]
 }

@@ -3,7 +3,7 @@ set -e
 pushd $(dirname $0)
 md5_cmd=md5
 
-PARSEC_VERSION="1.0.0rc3"
+PARSEC_VERSION=${PARSEC_VERSION:-1.0.0}
 PARSEC_TIMEOUT=60
 
 if ! test -x /sbin/md5; then
@@ -126,10 +126,10 @@ function gg_run() {
   GG_ADDITIONAL_CMD_ARGS="--trusted-plugin /provider.jar"
 
   if inspect=$(docker container inspect parsec_docker_run 2>/dev/null | grep ":/run/parsec"); then
-    # Parsec is running in a container
+    echo "Using Parsec service running in the parsec_docker_run container"
     PARSEC_SOCK_VOLUME=${inspect//\"/}
   else
-    # Parsec is running on the host
+    echo "Using Parsec service running on the host"
     PARSEC_SOCK_VOLUME="/run/parsec:/run/parsec"
   fi
 
