@@ -24,6 +24,20 @@ function update_git() {
   git submodule update --init --recursive
 }
 
+function setiface_master() {
+# On some boards the docker container virtual network interface
+# is not added to docker0 bridge automatically.
+# Let's check and add it manually if required.
+
+  for iface in $(ip link show type veth |grep veth|grep -v master|cut -f2 -d' '); do
+    iface=${iface%%@*}
+
+    echo "Adding $iface to docker0 bridge"
+    # Can also use "brctl addif docker0 $iface"
+    ip link set dev ${iface} master docker0
+  done
+}
+
 function build_greengrass_patched() {
   # Build GreenGrass docker image using key-op-prototype branch of AWS SDKs
   pushd ./parsec-greengrass-run-config/docker/
@@ -113,7 +127,8 @@ function parsec_run() {
 }
 
 function gg_run() {
-  docker rm -f "${1}" 2> /dev/null
+  # Remove GG container if exists
+  docker container rm -f "${1}" 2> /dev/null || true
 
   for warn_env in AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_REGION AWS_SESSION_TOKEN; do
     if [ "${!warn_env}" == "" ]; then
@@ -149,6 +164,8 @@ function gg_run() {
          -v ${PARSEC_SOCK_VOLUME} \
          -v GG_HOME:/home/ggc_user \
          parallaxsecond/greengrass_demo:latest "${2}"
+
+  setiface_master
 }
 
 function provision_thing() {
@@ -170,7 +187,7 @@ function manual_gg_run() {
     echo "Cleaning GG_HOME volume if exists"
     if docker volume inspect GG_HOME >/dev/null 2>&1; then
       if docker container inspect greengrass_demo_run >/dev/null 2>&1; then
-        docker container rm greengrass_demo_run >/dev/null
+        docker container rm -f greengrass_demo_run >/dev/null
       fi
       docker volume rm GG_HOME >/dev/null
     fi
