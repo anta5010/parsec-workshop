@@ -24,13 +24,13 @@ fi
 
 aws iam create-role --role-name ${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRole \
     --assume-role-policy-document file://device-role-trust-policy.json \
-    --permissions-boundary arn:aws:iam::{$AWS_ID}:policy/ProjAdminsPermBoundaryv2
+    --permissions-boundary arn:aws:iam::${AWS_ID}:policy/ProjAdminsPermBoundaryv2
 
 aws iam create-policy --policy-name ${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRoleAccess \
                       --policy-document file://device-role-access-policy.json
 
 aws iam attach-role-policy --role-name ${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRole \
-        --policy-arn arn:aws:iam::{$AWS_ID}:policy/${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRoleAccess
+        --policy-arn arn:aws:iam::${AWS_ID}:policy/${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRoleAccess
 
 aws iot create-role-alias --role-alias ${AWS_ROLE_PREFIX}-GreengrassCoreTokenExchangeRoleAlias \
-        --role-arn arn:aws:iam::{$AWS_ID}:role/Proj-AntA-GreengrassV2TokenExchangeRole
+        --role-arn arn:aws:iam::${AWS_ID}:role/Proj-AntA-GreengrassV2TokenExchangeRole
