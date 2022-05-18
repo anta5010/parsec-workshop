@@ -33,4 +33,4 @@ aws iam attach-role-policy --role-name ${AWS_ROLE_PREFIX}-GreengrassV2TokenExcha
         --policy-arn arn:aws:iam::${AWS_ID}:policy/${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRoleAccess
 
 aws iot create-role-alias --role-alias ${AWS_ROLE_PREFIX}-GreengrassCoreTokenExchangeRoleAlias \
-        --role-arn arn:aws:iam::${AWS_ID}:role/Proj-AntA-GreengrassV2TokenExchangeRole
+        --role-arn arn:aws:iam::${AWS_ID}:role/${AWS_ROLE_PREFIX}-GreengrassV2TokenExchangeRole
