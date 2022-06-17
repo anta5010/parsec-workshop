@@ -41,9 +41,7 @@ function setiface_master() {
 function build_greengrass_patched() {
   # Build GreenGrass docker image using key-op-prototype branch of AWS SDKs
   pushd ./parsec-greengrass-run-config/docker/
-  docker build . \
-        --tag parallaxsecond/greengrass_patched:latest \
-        --progress plain
+  docker build . --tag parallaxsecond/greengrass_patched:latest --progress plain
   popd
 }
 
@@ -74,7 +72,7 @@ function wait_for_parsec() {
     PARSEC_TOOL_CMD="docker exec -it parsec_docker_run parsec-tool ping"
   else
     echo "Checking for Parsec service running on the host"
-    PARSEC_TOOL_CMD="parsec-tool ping"
+    PARSEC_TOOL_CMD="${PARSEC_TOOL:-parsec-tool} ping"
   fi
 
   WAIT_TIME=0
@@ -145,7 +143,11 @@ function gg_run() {
     PARSEC_SOCK_VOLUME=${inspect//\"/}
   else
     echo "Using Parsec service running on the host"
-    PARSEC_SOCK_VOLUME="/run/parsec:/run/parsec"
+
+    PARSEC_SERVICE_ENDPOINT=${PARSEC_SERVICE_ENDPOINT:-unix:/run/parsec/parsec.sock}
+    PARSEC_RUN_DIR=${PARSEC_SERVICE_ENDPOINT%/parsec.sock}
+    PARSEC_RUN_DIR=${PARSEC_RUN_DIR#unix:}
+    PARSEC_SOCK_VOLUME="${PARSEC_RUN_DIR}:/run/parsec"
   fi
 
   # shellcheck disable=SC2086
