@@ -1,6 +1,7 @@
-FROM amazoncorretto:8 as builder
+FROM eclipse-temurin:11 as builder
 WORKDIR "/home/ggc_user"
-RUN yum install -y unzip
+RUN apt-get update && \
+    apt-get install -y unzip
 
 # Pass AWS Credentials into docker build with --build-args
 ENV THING_NAME=sample-thing
@@ -13,15 +14,18 @@ RUN mkdir /greengrass && \
     cd /greengrass && \
     unzip ../${GREENGRASS_ZIP_FILE}
 
-FROM amazoncorretto:8 as from_source_builder
+FROM eclipse-temurin:11 as from_source_builder
 # able to trigger the build when repo is dirty
-RUN yum install -y maven make cmake3 git gcc && \
-    ln -s /usr/bin/cmake3 /usr/bin/cmake
+RUN apt-get update && \
+    apt-get install -y maven make cmake git gcc
+
+COPY CRT.patch /home/ggc_user/CRT.patch
 
 RUN git clone --recursive https://github.com/awslabs/aws-crt-java.git && \
     cd aws-crt-java && \
     git checkout key-op-prototype && \
     git submodule update --init && \
+    patch -p1 </home/ggc_user/CRT.patch && \
     mvn -N io.takari:maven:0.7.7:wrapper && \
     ./mvnw clean source:jar install -DskipTests=true
 
@@ -42,7 +46,7 @@ RUN git clone --recursive  https://github.com/revaultch/aws-greengrass-nucleus.g
 RUN find /root/.m2/repository/ -mindepth 2 -maxdepth 2 |grep -v -E '(com/aws|software/amazon)'|xargs rm -rf && \
     find /root/.m2/repository -type f
 
-FROM amazoncorretto:8
+FROM eclipse-temurin:11
 LABEL greengrass-version=${GREENGRASS_RELEASE_VERSION}
 COPY --from=builder /greengrass/ /greengrass/
 COPY --from=from_source_builder /aws-greengrass-nucleus/target/Greengrass.jar /greengrass/lib/
@@ -55,7 +59,8 @@ ENV GG_ADDITIONAL_CMD_ARGS=""
 ENV GG_START=""
 ENV GG_PROVISION=""
 ENV GG_THING_NAME=""
-RUN yum install -y awscli shadow-utils
+RUN apt-get update && \
+    apt-get install -y awscli passwd
 RUN groupadd ggc_group && \
     useradd ggc_user -m -g ggc_group
 WORKDIR /home/ggc_user

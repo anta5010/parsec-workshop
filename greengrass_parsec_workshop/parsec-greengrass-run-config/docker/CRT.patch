@@ -1,0 +1,25 @@
+When aws CRT library is built it's installed into /linux/<arch>/ directory.
+
+The build process uses C headers to find the arch:
+https://github.com/awslabs/aws-crt-java/blob/main/cmake/archdetect.c
+
+When the library is loaded Java System.getProperty("os.arch") function is used:
+https://github.com/awslabs/aws-crt-java/blob/98fcb9a7191363606d051300ae29a44f792fc5cd/src/main/java/software/amazon/awssdk/crt/CRT.java#L105
+
+In the docker image we use C headers report arch as armv7, but Java reports it as "arm" and this code
+tries to load it from /linux/armv6 and fails. This is a temp work around for our demo.
+
+
+diff --git a/src/main/java/software/amazon/awssdk/crt/CRT.java b/src/main/java/software/amazon/awssdk/crt/CRT.java
+index bfa5ec3..c5ace7c 100644
+--- a/src/main/java/software/amazon/awssdk/crt/CRT.java
++++ b/src/main/java/software/amazon/awssdk/crt/CRT.java
+@@ -115,7 +115,7 @@ public final class CRT {
+         } else if (arch.startsWith("arm64") || arch.startsWith("aarch64")) {
+             return (getOSIdentifier() == "android") ? "arm64-v8a" : "armv8";
+         } else if (arch.equals("arm")) {
+-            return "armv6";
++            return "armv7";
+         }
+
+         throw new UnknownPlatformException("AWS CRT: architecture not supported: " + arch);
